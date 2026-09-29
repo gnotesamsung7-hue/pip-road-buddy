@@ -1,0 +1,802 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0D1220">
+<link rel="icon" href="icon.png">
+<title>Pip Road Buddy</title>
+<style>
+  @font-face{font-family:"Baloo 2";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/baloo-2-latin-500-normal.woff2) format("woff2")}
+  @font-face{font-family:"Baloo 2";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/baloo-2-latin-700-normal.woff2) format("woff2")}
+  @font-face{font-family:"Baloo 2";font-weight:800;font-style:normal;font-display:swap;src:url(fonts/baloo-2-latin-800-normal.woff2) format("woff2")}
+  @font-face{font-family:"Nunito";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/nunito-latin-500-normal.woff2) format("woff2")}
+  @font-face{font-family:"Nunito";font-weight:700;font-style:normal;font-display:swap;src:url(fonts/nunito-latin-700-normal.woff2) format("woff2")}
+  @font-face{font-family:"IBM Plex Mono";font-weight:500;font-style:normal;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+  body{margin:0} [hidden]{display:none!important}
+  :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .hint{display:flex;align-items:center;justify-content:center;gap:8px}
+  .mic{width:12px;height:12px;border-radius:50%;background:var(--stop);display:none;flex:none}
+  body.listening .mic{display:inline-block;animation:pulse 1s ease-in-out infinite}
+  body.listening .hint{color:var(--text)}
+  @keyframes pulse{50%{transform:scale(1.5);opacity:.45}}
+  .settings input:disabled + *{opacity:.5}
+
+  :root{
+    color-scheme: dark;
+    --night:#0D1220; --panel:#161D31; --line:#26304A;
+    --fur:#FFB86B; --fur-2:#FFD9A8; --cheek:#FF8FA3; --ink:#2A1B12;
+    --go:#7BE0A6; --warn:#FFD166; --stop:#FF5A5F;
+    --text:#E9EDF7; --muted:#8C95AF;
+    --display:"Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+    --body:"Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  }
+  html,body{height:100%}
+  body{background:var(--night);color:var(--text);font-family:var(--body);font-size:15px;
+    padding-inline:16px;box-sizing:border-box;overflow:hidden;-webkit-tap-highlight-color:transparent}
+  *{box-sizing:border-box}
+  .app{height:100%;max-width:760px;margin:0 auto;display:grid;grid-template-rows:auto 1fr auto;gap:10px;padding-block:12px}
+
+  /* top gauges */
+  .gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .g{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 12px;min-width:0}
+  .g small{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .g b{font-family:var(--mono);font-weight:500;font-size:20px;font-variant-numeric:tabular-nums}
+  .meter{height:8px;border-radius:99px;background:var(--line);margin-top:8px;overflow:hidden}
+  .meter i{display:block;height:100%;width:100%;background:var(--go);border-radius:99px;transition:width .6s,background .6s}
+  #alertLabel{font-family:var(--display);font-weight:700;font-size:18px;line-height:1.1}
+
+  /* stage */
+  .stage{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:0;cursor:pointer;border-radius:24px;outline:none}
+  .stage:focus-visible{box-shadow:0 0 0 3px var(--fur)}
+  .bubble{font-family:var(--display);font-weight:700;font-size:clamp(20px,5vw,28px);line-height:1.2;text-align:center;
+    background:var(--text);color:var(--night);padding:12px 20px;border-radius:22px;max-width:min(92%,520px);position:relative;text-wrap:balance}
+  .bubble:after{content:"";position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);border:10px solid transparent;border-bottom:0;border-top-color:var(--text)}
+  .petwrap{position:relative;width:min(62vw,40vh,300px);aspect-ratio:1;max-width:100%}
+  .ring{position:absolute;inset:-4%;width:108%;height:108%;transform:rotate(-90deg);pointer-events:none}
+  .ring circle{fill:none;stroke-width:5}
+  .ring .track{stroke:var(--line);opacity:0}
+  .ring .prog{stroke:var(--go);stroke-linecap:round;opacity:0;transition:stroke .3s}
+  body.check .ring .track, body.check .ring .prog{opacity:1}
+  .hint{font-size:14px;color:var(--muted);text-align:center;min-height:1.3em}
+
+  /* buddy */
+  #pet{width:100%;height:100%;overflow:visible;--skin:#FFE8DA;--skin-2:#F6CDB9;--ink:#2A1B2E;--cheek:#FF9DB0}
+  #pet[data-gender="girl"]{--hair:#F59DC2;--hair-dark:#D46F9C;--iris:#46C3B9;--iris-dark:#1F6C7A;--shirt:#FFFFFF;--collar:#3C4E8C;--accent:#FF5C7A}
+  #pet[data-gender="boy"]{--hair:#4B5FA6;--hair-dark:#2D3A70;--iris:#F4B24A;--iris-dark:#96560F;--shirt:#FFB86B;--collar:#E28D3A;--accent:#7BE0A6}
+  #pet[data-gender="girl"] .g-boy, #pet[data-gender="boy"] .g-girl{display:none}
+  #pet .bob{animation:bob 2.6s ease-in-out infinite;transform-origin:100px 196px}
+  #pet .eye{transform-box:fill-box;transform-origin:center;animation:blink 5s infinite}
+  #pet .brows path{transform-box:fill-box;transform-origin:center;transition:transform .3s}
+  #pet .closed, #pet .squint, #pet .m-o, #pet .m-flat, #pet .sweat, #pet .zz{display:none}
+  #pet[data-mood="ask"] .m-happy{display:none} #pet[data-mood="ask"] .m-o{display:inline}
+  #pet[data-mood="ask"] .bob{animation:hop .7s ease-in-out infinite}
+  #pet[data-mood="ask"] .brow-l{transform:translateY(-3px)} #pet[data-mood="ask"] .brow-r{transform:translateY(-3px)}
+  #pet[data-mood="alarm"] .m-happy{display:none} #pet[data-mood="alarm"] .m-o{display:inline}
+  #pet[data-mood="alarm"] .sweat{display:inline}
+  #pet[data-mood="alarm"] .bob{animation:shake .25s linear infinite}
+  #pet[data-mood="alarm"] .eye{animation:none;transform:scale(1.12)}
+  #pet[data-mood="alarm"] .brow-l, #pet[data-mood="worried"] .brow-l{transform:rotate(-14deg) translateY(-2px)}
+  #pet[data-mood="alarm"] .brow-r, #pet[data-mood="worried"] .brow-r{transform:rotate(14deg) translateY(-2px)}
+  #pet[data-mood="worried"] .m-happy{display:none} #pet[data-mood="worried"] .m-flat{display:inline}
+  #pet[data-mood="worried"] .sweat{display:inline}
+  #pet[data-mood="sleep"] .open{display:none} #pet[data-mood="sleep"] .closed{display:inline}
+  #pet[data-mood="sleep"] .m-happy{display:none} #pet[data-mood="sleep"] .m-flat{display:inline}
+  #pet[data-mood="sleep"] .zz{display:inline} #pet[data-mood="sleep"] .bob{animation:breathe 4s ease-in-out infinite}
+  #pet[data-mood="cheer"] .open{display:none} #pet[data-mood="cheer"] .squint{display:inline}
+  #pet[data-mood="cheer"] .bob{animation:hop .45s ease-in-out 3}
+  .seg{display:inline-flex;background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:3px;gap:2px}
+  .seg input{position:absolute;opacity:0;pointer-events:none}
+  .seg label{padding:5px 12px;border-radius:99px;color:var(--muted);font-weight:700}
+  .seg input:checked + label{background:var(--fur);color:var(--night)}
+  .seg input:focus-visible + label{outline:2px solid var(--text)}
+  .zz text{font-family:var(--display);font-weight:800;fill:var(--muted);animation:float 3s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-6px)}}
+  @keyframes hop{50%{transform:translateY(-16px) scale(1.03,.97)}}
+  @keyframes breathe{50%{transform:scale(1.03,.97)}}
+  @keyframes shake{25%{transform:translateX(-5px) rotate(-3deg)}75%{transform:translateX(5px) rotate(3deg)}}
+  @keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+  @keyframes float{0%{opacity:0;transform:translateY(8px)}40%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+
+  /* controls */
+  .controls{display:grid;gap:8px}
+  .btn{font-family:var(--display);font-weight:800;font-size:22px;border:0;border-radius:18px;padding:16px;cursor:pointer;color:var(--night);background:var(--fur);min-height:64px}
+  .btn:focus-visible{outline:3px solid var(--text);outline-offset:2px}
+  .btn.go{background:var(--go)} .btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line);font-size:17px;min-height:52px;padding:10px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .settings{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:center;font-size:14px;color:var(--muted)}
+  .settings label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .settings select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:4px 6px;font:inherit}
+  .settings input{accent-color:var(--fur);width:18px;height:18px}
+  .stats{font-family:var(--mono);font-size:12px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+  .note{font-size:12px;color:var(--muted);text-align:center;max-width:60ch;margin:0 auto;line-height:1.45}
+
+  /* alarm overlay */
+  .alarm{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    background:var(--stop);color:#fff;text-align:center;padding:24px 16px;cursor:pointer;animation:flash .5s steps(2) infinite}
+  .alarm h2{font-family:var(--display);font-weight:800;font-size:clamp(34px,9vw,60px);margin:0;line-height:1}
+  .alarm p{font-size:18px;margin:0;max-width:30ch}
+  .alarm .tap{font-family:var(--display);font-weight:800;font-size:24px;background:#fff;color:var(--stop);border-radius:99px;padding:14px 28px}
+  @keyframes flash{50%{background:#7A0F14}}
+  .banner{background:color-mix(in srgb,var(--warn) 18%,var(--panel));border:1px solid var(--warn);color:var(--text);border-radius:14px;padding:10px 14px;font-size:14px;text-align:center}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:0s!important;animation-iteration-count:1!important}.alarm{animation:none}}
+  @media (max-height:620px){.note{display:none}.btn{min-height:54px;padding:10px}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="gauges" aria-live="polite">
+    <div class="g"><small>Driving</small><b id="driveTime">0:00</b></div>
+    <div class="g"><small>Next check</small><b id="nextCheck">--:--</b></div>
+    <div class="g"><small>Alertness</small><div id="alertLabel">Ready</div><div class="meter"><i id="meter"></i></div></div>
+  </header>
+
+  <main class="stage" id="stage" tabindex="0" aria-label="Your buddy. Tap to answer a question">
+    <div class="bubble" id="bubble" aria-live="assertive">Hi, I'm Mika! I'll ride along and keep you awake.</div>
+    <div class="petwrap">
+      <svg class="ring" viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="46"/>
+        <circle class="prog" id="ringProg" cx="50" cy="50" r="46" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/>
+      </svg>
+      <svg id="pet" viewBox="0 0 200 204" data-mood="happy" data-gender="girl" role="img" aria-label="Your driving buddy">
+        <ellipse cx="100" cy="197" rx="52" ry="6" fill="#000" opacity=".35"/>
+        <g class="bob">
+          <!-- back hair -->
+          <g class="g-girl">
+            <path d="M52 70 Q14 104 24 152 Q28 172 40 180 Q34 142 58 100 Z" fill="var(--hair)"/>
+            <path d="M148 70 Q186 104 176 152 Q172 172 160 180 Q166 142 142 100 Z" fill="var(--hair)"/>
+            <path d="M44 92 Q40 36 100 28 Q160 36 156 92 L160 162 Q148 172 136 160 L134 124 L66 124 L64 160 Q52 172 40 162 Z" fill="var(--hair-dark)"/>
+            <circle cx="52" cy="72" r="6" fill="var(--accent)"/><circle cx="148" cy="72" r="6" fill="var(--accent)"/>
+          </g>
+          <path class="g-boy" d="M46 94 Q40 34 100 26 Q160 34 154 94 L150 122 L50 122 Z" fill="var(--hair-dark)"/>
+          <!-- body -->
+          <rect x="91" y="132" width="18" height="16" rx="4" fill="var(--skin-2)"/>
+          <path d="M56 200 Q58 154 100 145 Q142 154 144 200 Z" fill="var(--shirt)"/>
+          <g class="g-girl">
+            <path d="M72 151 L100 174 L128 151 L135 160 L100 190 L65 160 Z" fill="var(--collar)"/>
+            <path d="M78 156 L100 175 L122 156" stroke="#fff" stroke-width="2" fill="none"/>
+            <path d="M100 176 L86 168 L88 186 Z M100 176 L114 168 L112 186 Z" fill="var(--accent)"/>
+            <circle cx="100" cy="176" r="4" fill="var(--accent)"/>
+          </g>
+          <g class="g-boy">
+            <path d="M68 152 Q100 172 132 152 Q132 164 100 174 Q68 164 68 152 Z" fill="var(--collar)"/>
+            <path d="M92 166 L90 186 M108 166 L110 186" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="90" cy="187" r="2.6" fill="#fff"/><circle cx="110" cy="187" r="2.6" fill="#fff"/>
+          </g>
+          <!-- head -->
+          <circle cx="47" cy="100" r="8" fill="var(--skin-2)"/><circle cx="153" cy="100" r="8" fill="var(--skin-2)"/>
+          <path d="M46 90 Q46 38 100 38 Q154 38 154 90 Q154 126 124 139 Q100 148 76 139 Q46 126 46 90 Z" fill="var(--skin)"/>
+          <!-- eyes -->
+          <g class="open">
+            <g class="eye">
+              <ellipse cx="76" cy="103" rx="12" ry="15" fill="var(--iris-dark)"/>
+              <ellipse cx="76" cy="107" rx="9.5" ry="10" fill="var(--iris)"/>
+              <ellipse cx="76" cy="104" rx="5" ry="7" fill="#1C1430"/>
+              <circle cx="80.5" cy="97" r="4.6" fill="#fff"/><circle cx="71" cy="110" r="2.2" fill="#fff"/>
+              <path d="M62 92 Q76 82 91 91" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+              <path class="g-girl" d="M63 93 L57 89" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+            </g>
+            <g class="eye">
+              <ellipse cx="124" cy="103" rx="12" ry="15" fill="var(--iris-dark)"/>
+              <ellipse cx="124" cy="107" rx="9.5" ry="10" fill="var(--iris)"/>
+              <ellipse cx="124" cy="104" rx="5" ry="7" fill="#1C1430"/>
+              <circle cx="128.5" cy="97" r="4.6" fill="#fff"/><circle cx="119" cy="110" r="2.2" fill="#fff"/>
+              <path d="M109 91 Q124 82 138 92" stroke="var(--ink)" stroke-width="4" fill="none" stroke-linecap="round"/>
+              <path class="g-girl" d="M137 93 L143 89" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/>
+            </g>
+          </g>
+          <g class="closed" stroke="var(--ink)" stroke-width="3.5" stroke-linecap="round" fill="none">
+            <path d="M64 104 Q76 112 88 104"/><path d="M112 104 Q124 112 136 104"/>
+          </g>
+          <g class="squint" stroke="var(--ink)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+            <path d="M65 107 L76 97 L87 107"/><path d="M113 107 L124 97 L135 107"/>
+          </g>
+          <g class="brows" stroke="var(--hair-dark)" stroke-width="2.6" stroke-linecap="round" fill="none">
+            <path class="brow-l" d="M66 79 Q76 75 86 78"/><path class="brow-r" d="M114 78 Q124 75 134 79"/>
+          </g>
+          <!-- cheeks, nose, mouth -->
+          <ellipse cx="63" cy="122" rx="10" ry="5" fill="var(--cheek)" opacity=".55"/>
+          <ellipse cx="137" cy="122" rx="10" ry="5" fill="var(--cheek)" opacity=".55"/>
+          <path d="M58 124 l3 -5 M63 124 l3 -5 M68 124 l3 -5 M132 124 l3 -5 M137 124 l3 -5 M142 124 l3 -5" stroke="#EE7F9A" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M100.5 115 l-1.5 3" stroke="#D99A88" stroke-width="1.8" stroke-linecap="round"/>
+          <path class="m-happy" d="M92 125 L108 125 Q100 137 92 125 Z" fill="#C2475E" stroke="#8A2E40" stroke-width="1.5" stroke-linejoin="round"/>
+          <ellipse class="m-o" cx="100" cy="129" rx="5" ry="6.5" fill="#C2475E" stroke="#8A2E40" stroke-width="1.5"/>
+          <path class="m-flat" d="M93 129 Q96.5 126 100 129 Q103.5 132 107 129" stroke="#8A2E40" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <!-- front hair -->
+          <g class="g-girl">
+            <path d="M46 92 Q43 42 100 34 Q157 42 154 92 Q150 72 141 62 L137 86 Q128 66 118 58 L112 82 Q104 62 96 56 L88 84 Q80 64 72 60 L65 88 Q57 72 50 74 Z" fill="var(--hair)"/>
+            <path d="M47 86 Q38 120 50 144 Q52 118 58 96 Z M153 86 Q162 120 150 144 Q148 118 142 96 Z" fill="var(--hair)"/>
+            <path d="M140 50 L125 40 L127 61 Z M140 50 L155 40 L153 61 Z" fill="var(--accent)"/><circle cx="140" cy="50" r="4.5" fill="#fff" opacity=".9"/>
+          </g>
+          <g class="g-boy">
+            <path d="M46 96 Q41 40 100 32 Q159 40 154 96 L147 70 L141 90 L131 62 L123 86 L113 58 L105 84 L95 58 L87 86 L77 62 L69 90 L61 68 L54 92 Z" fill="var(--hair)"/>
+            <path d="M46 88 L48 120 L57 96 Z M154 88 L152 120 L143 96 Z" fill="var(--hair)"/>
+          </g>
+          <path d="M100 36 Q94 16 110 10 Q102 22 105 36 Z" fill="var(--hair)"/>
+          <path d="M66 52 Q100 38 134 52" stroke="#fff" stroke-width="3" fill="none" opacity=".35" stroke-linecap="round"/>
+          <path class="sweat" d="M156 70 Q165 86 156 92 Q147 86 156 70 Z" fill="#8FD3FF"/>
+          <g class="zz"><text x="150" y="48" font-size="22">z</text><text x="166" y="28" font-size="28" style="animation-delay:1s">Z</text></g>
+        </g>
+      </svg>
+    </div>
+    <div class="hint" id="hint"><span class="mic" aria-hidden="true"></span><span id="hintText">Mount your phone, then press Start drive.</span></div>
+  </main>
+
+  <footer class="controls">
+    <div class="banner" id="banner" hidden></div>
+    <button class="btn go" id="mainBtn">Start drive</button>
+    <div class="row" id="driveRow" hidden>
+      <button class="btn ghost" id="breakBtn">Take a break</button>
+      <button class="btn ghost" id="endBtn">End drive</button>
+    </div>
+    <div class="settings">
+      <div class="seg" role="radiogroup" aria-label="Choose your buddy">
+        <input type="radio" name="gender" id="g-girl" value="girl" checked><label for="g-girl">Mika ♀</label>
+        <input type="radio" name="gender" id="g-boy" value="boy"><label for="g-boy">Ren ♂</label>
+      </div>
+      <label for="interval">Check every
+        <select id="interval"><option value="2">2 min</option><option value="3">3 min</option><option value="5" selected>5 min</option><option value="8">8 min</option><option value="10">10 min</option></select>
+      </label>
+      <label for="voice"><input type="checkbox" id="voice" checked> Buddy talks</label>
+      <label for="mic" id="micLabel"><input type="checkbox" id="mic" checked> <span>Answer by voice</span></label>
+      <label for="chat"><input type="checkbox" id="chat" checked> Chat between checks</label>
+    </div>
+    <div class="stats" id="stats">Answered 0 · Avg reply – · Missed 0</div>
+    <p class="note">Your buddy asks easy questions to keep your mind awake. It can't replace sleep. If your eyes feel heavy, pull over somewhere safe and rest for 15–20 minutes. Say “break” when you stop.</p>
+  </footer>
+</div>
+
+<div class="alarm" id="alarm" hidden role="alertdialog" aria-label="Wake up alarm">
+  <h2>WAKE UP!</h2>
+  <p>You didn't answer your buddy. Stay alert and find a safe place to pull over.</p>
+  <p id="alarmHint">Say “I'm awake!” or tap anywhere</p>
+  <div class="tap">Tap here, I'm awake</div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pet = $('pet'), bubble = $('bubble'), hint = $('hintText');
+  const LISTEN_WINDOW = 10000, TAP_WINDOW = 12000, BREAK_EVERY = 120*60000, BREAK_LEN = 15*60000;
+
+  const store = {
+    get(k,d){try{const v=localStorage.getItem('pip.'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},
+    set(k,v){try{localStorage.setItem('pip.'+k,JSON.stringify(v))}catch(e){}}
+  };
+  $('interval').value = store.get('interval','5');
+  $('voice').checked = store.get('voice',true);
+  $('mic').checked = store.get('mic',true);
+  $('chat').checked = store.get('chat',true);
+  ['interval','voice','mic','chat'].forEach(id=>$(id).addEventListener('change',e=>{
+    store.set(id, e.target.type==='checkbox'?e.target.checked:e.target.value);
+    if(id==='interval' && S.state==='drive') scheduleCheck();
+    if(id==='mic'){ if(!e.target.checked) Voice.stop(); driveHint(); }
+  }));
+
+  const S = { state:'idle', driveMs:0, lastTick:0, nextCheckAt:0, nextChatAt:0, breakUntil:0, nextBreakAt:BREAK_EVERY,
+    times:[], missed:0, passed:0, wrong:0, sleepy:0, lastSlowWarn:0, convo:null, memo:null, lastType:'', alarm:null };
+
+  /* ---------- helpers ---------- */
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const rand = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+  const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : s;
+  const short = s => { s=(s||'').trim(); return s.length>40 ? s.slice(0,40)+'…' : s; };
+  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9\s-]/g,' ').replace(/-/g,' ').replace(/\s+/g,' ').trim();
+  function findIn(alts, list){
+    for(const raw of alts){
+      const a=' '+norm(raw)+' ', compact=a.replace(/ /g,'');
+      for(const item of list){
+        const n=norm(item);
+        if(a.includes(' '+n+' ')) return item;
+        const nc=n.replace(/ /g,''); if(nc.length>=5 && compact.includes(nc)) return item;
+      }
+    }
+    return null;
+  }
+  const NUMW = {zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,
+    fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,
+    wala:0,isa:1,dalawa:2,tatlo:3,apat:4,lima:5,anim:6,pito:7,walo:8,siyam:9,sampu:10,labingisa:11,labindalawa:12,labintatlo:13,
+    labingapat:14,labinlima:15,labinganim:16,labimpito:17,labingpito:17,labingwalo:18,labinsiyam:19,labingsiyam:19,dalawampu:20,
+    uno:1,dos:2,tres:3,kwatro:4,kuwatro:4,singko:5,sinko:5,sais:6,siyete:7,syete:7,otso:8,nuwebe:9,nueve:9,diyes:10,dyes:10,
+    onse:11,dose:12,trese:13,katorse:14,kinse:15,disisais:16,disisyete:17,disisiyete:17,disiotso:18,disinuwebe:19,bente:20,beinte:20};
+  function numbers(s, splitDigits){
+    const t=norm(s).split(' '), out=[];
+    for(let i=0;i<t.length;i++){
+      const w=t[i]; if(!w) continue;
+      if(/^\d+$/.test(w)){ if(splitDigits && w.length>1 && w.length<=5) out.push(...w.split('').map(Number)); else out.push(Number(w)); continue; }
+      const two=w+(t[i+1]||'');
+      if(t[i+1] && NUMW[two]!==undefined){ out.push(NUMW[two]); i++; continue; }
+      if(NUMW[w]!==undefined) out.push(NUMW[w]);
+    }
+    return out;
+  }
+  const hasSeq = (arr, seq) => { let j=0; for(const x of arr){ if(x===seq[j]) j++; if(j===seq.length) return true; } return false; };
+  const YES=['yes','yeah','yep','yup','oo','opo','oho','medyo','sure','inaantok','antok','sleepy','tired','pagod','kind of','a little'];
+  const NO=['no','nope','nah','hindi','hinde','di','not','awake','gising','okay lang','ok lang','ayos lang'];
+  function yesNo(alts){ if(findIn(alts,NO)) return 'no'; if(findIn(alts,YES)) return 'yes'; return null; }
+  const BREAK_WORDS=['break','take a break','pahinga','magpahinga','rest stop','pit stop'];
+
+  /* ---------- audio ---------- */
+  let ac=null, sirenTimer=null, sirenOsc=null, sirenGain=null;
+  function audio(){ if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){} } if(ac&&ac.state==='suspended') ac.resume(); return ac; }
+  function tone(f,start,dur,type='sine',vol=.35){
+    const a=audio(); if(!a) return;
+    const o=a.createOscillator(), g=a.createGain(); o.type=type; o.frequency.value=f;
+    const t=a.currentTime+start; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.02); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+.05);
+  }
+  const chime = () => { tone(880,0,.25); tone(1175,.18,.35); tone(1568,.36,.5); };
+  const happy = () => { tone(660,0,.15,'triangle'); tone(990,.12,.25,'triangle'); };
+  const buzz = () => { try{ if(window.PipNative) PipNative.vibrate(); else if(navigator.vibrate) navigator.vibrate([400,200,400,200,400]); }catch(e){} };
+  function sirenOn(){
+    const a=audio(); if(!a||sirenOsc) return;
+    sirenOsc=a.createOscillator(); sirenGain=a.createGain(); sirenOsc.type='square'; sirenGain.gain.value=.5;
+    sirenOsc.connect(sirenGain).connect(a.destination); sirenOsc.start();
+    let hi=false; sirenTimer=setInterval(()=>{hi=!hi; if(sirenOsc) sirenOsc.frequency.setValueAtTime(hi?1150:720,a.currentTime)},280);
+    buzz();
+  }
+  function sirenOff(){ clearInterval(sirenTimer); if(sirenOsc){try{sirenOsc.stop()}catch(e){} sirenOsc.disconnect(); sirenOsc=null;} }
+
+  /* ---------- buddy ---------- */
+  const mood = m => pet.dataset.mood = m;
+  const BUDDY = { girl:{name:'Mika',pitch:1.45,yay:['Yatta!','Sugoi!','Galing!']}, boy:{name:'Ren',pitch:0.95,yay:['Yosh!','Nice!','Galing!']} };
+  let G = store.get('gender','girl'); if(!BUDDY[G]) G='girl';
+  const NAME = () => BUDDY[G].name;
+  function setGender(g, greet){
+    G=g; store.set('gender',g); pet.dataset.gender=g; $('g-'+g).checked=true;
+    if(greet && !S.convo){ mood('cheer'); setTimeout(()=>{ if(!S.convo && (S.state==='drive'||S.state==='idle')) mood('happy'); },1400);
+      say(S.state==='idle' ? `Hi, I'm ${NAME()}! I'll ride along and keep you awake.` : `${NAME()} here! I'll keep you company.`); }
+    driveHint();
+  }
+  document.querySelectorAll('input[name=gender]').forEach(r=>r.addEventListener('change',e=>setGender(e.target.value,true)));
+
+  /* ---------- speaking ---------- */
+  let speakSeq=0, speakCb=null, speakTimer=null;
+  function spoke(id){ if(speakCb && speakCb.id===id){ const d=speakCb.done; speakCb=null; clearTimeout(speakTimer); setTimeout(d,250); } }
+  function say(text, done){
+    bubble.textContent = text;
+    const id='u'+(++speakSeq);
+    if(done){ speakCb={id,done}; clearTimeout(speakTimer);
+      speakTimer=setTimeout(()=>spoke(id), $('voice').checked ? 2500+text.length*80 : 700); }
+    if(!$('voice').checked) return;
+    if(window.PipNative){ try{ PipNative.speak(text, BUDDY[G].pitch, id); }catch(e){} }
+    else if('speechSynthesis' in window){
+      try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=1.05; u.pitch=BUDDY[G].pitch;
+        u.onend=()=>spoke(id); speechSynthesis.speak(u);}catch(e){}
+    }
+  }
+
+  /* ---------- listening ---------- */
+  const Voice = {
+    mode:null, lang:'fil-PH', broken:false, active:false, rec:null,
+    init(){
+      try{ if(window.PipNative && PipNative.canListen()) this.mode='native'; }catch(e){}
+      if(!this.mode && (window.SpeechRecognition||window.webkitSpeechRecognition)) this.mode='web';
+      if(!this.mode){ $('mic').checked=false; $('mic').disabled=true; $('micLabel').title='Voice answers need the Android app or Chrome'; }
+    },
+    usable(){ return !!this.mode && !this.broken && $('mic').checked; },
+    listen(){
+      if(!this.usable() || this.active) return;
+      this.active=true; this.startedAt=Date.now(); setMic(true);
+      if(this.mode==='native'){ try{ PipNative.listen(this.lang); }catch(e){ this.fail("Voice answers aren't working. Tap to answer for now."); } return; }
+      try{
+        const R=window.SpeechRecognition||window.webkitSpeechRecognition, r=new R(); this.rec=r;
+        let settled=false;
+        r.lang=this.lang; r.maxAlternatives=5; r.interimResults=false; r.continuous=false;
+        r.onspeechstart=()=>PipVoice.onStart();
+        r.onresult=e=>{ settled=true; const res=e.results[0], alts=[]; for(let i=0;i<res.length;i++) alts.push(res[i].transcript); PipVoice.onResult(alts); };
+        r.onerror=e=>{ settled=true; PipVoice.onError(e.error); };
+        r.onend=()=>{ if(!settled && this.rec===r) PipVoice.onError('no-speech'); };
+        r.start();
+      }catch(e){ this.fail("Voice answers aren't working here. Tap to answer instead."); }
+    },
+    stop(){
+      this.active=false; setMic(false);
+      try{ if(this.mode==='native') PipNative.stopListening(); else if(this.rec){ const r=this.rec; this.rec=null; r.abort(); } }catch(e){}
+    },
+    fail(msg){ this.broken=true; this.stop(); showBanner(msg); driveHint(); }
+  };
+  function wantListening(){
+    return (S.convo && S.convo.listenStart && !S.convo.done) || (S.state==='alarm' && S.alarm && S.alarm.phase==='listen');
+  }
+  function relisten(){ setTimeout(()=>{ if(wantListening()) Voice.listen(); }, 350); }
+  const PipVoice = window.PipVoice = {
+    onSpoken: id => spoke(id),
+    onStart(){ const c=S.convo; if(c && c.listenStart && !c.heardAt) c.heardAt=Date.now(); hint.textContent='Hearing you…'; },
+    onResult(alts){
+      Voice.active=false; setMic(false);
+      alts=(alts||[]).map(String).filter(x=>x.trim());
+      if(!alts.length) return relisten();
+      heard(alts);
+    },
+    onError(code){
+      Voice.active=false; setMic(false);
+      const retry=['no-speech','aborted','no-match',6,7,8,11];
+      const lang=[12,13,'language-not-supported'];
+      const net=[1,2,4,'network'];
+      const perm=[3,9,'not-allowed','service-not-allowed','audio-capture'];
+      if(retry.includes(code)) return relisten();
+      if(lang.includes(code) || net.includes(code)){
+        if(Voice.lang!=='en-US'){ Voice.lang='en-US'; return relisten(); }
+        return Voice.fail('Voice answers need signal or the offline speech pack. Tap to answer for now.');
+      }
+      if(perm.includes(code)) return Voice.fail("The microphone isn't available, so tap to answer instead.");
+      relisten();
+    },
+    onMic(granted){ if(!granted) Voice.fail('Microphone permission was denied. Tap to answer, or allow it in Settings.'); }
+  };
+  function setMic(on){ document.body.classList.toggle('listening', !!on); if(on) hint.textContent='Listening… answer out loud'; }
+  function driveHint(){
+    if(S.state!=='drive' || S.convo) return;
+    hint.textContent = Voice.usable() ? `${NAME()} will ask you easy questions. Just answer out loud!` : `Tap ${NAME()} or the big button when ${NAME()} asks.`;
+  }
+
+  /* ---------- question bank ---------- */
+  const CATS = {
+    fruit:{ask:['Name a fruit!','Quick, say any fruit!','What fruit do you like?'], yes:x=>`${cap(x)}! Yum, good pick!`,
+      items:['apple','banana','mango','orange','grapes','grape','pineapple','papaya','watermelon','melon','strawberry','lemon','calamansi','coconut','guava','avocado','durian','lanzones','rambutan','jackfruit','pear','cherry','kiwi','peach','lychee','atis','chico','saging','mangga','pinya','bayabas','niyog','buko','pakwan','ubas','dalandan','suha','pomelo','langka','santol','dragon fruit','sampalok','tamarind','mangosteen','star apple','caimito','duhat','marang','blueberry','lime','dalanghita','kamias','macopa','abukado']},
+    animal:{ask:['Name an animal!','Say any animal you can think of!','What animal would you have as a pet?'], yes:x=>`${cap(x)}! Cute!`,
+      items:['dog','cat','bird','cow','pig','horse','chicken','duck','fish','lion','tiger','elephant','monkey','snake','frog','carabao','goat','sheep','rabbit','bunny','mouse','rat','bear','deer','eagle','owl','shark','whale','dolphin','turtle','crab','shrimp','ant','bee','butterfly','spider','zebra','giraffe','kangaroo','panda','fox','wolf','tarsier','hamster','parrot','penguin','aso','pusa','ibon','baka','baboy','kabayo','manok','pato','isda','unggoy','ahas','palaka','kalabaw','kambing','tupa','kuneho','daga','pagong','alimango','hipon','langgam','bubuyog','paruparo','gagamba','butiki','agila','kuwago','tuta','kuting']},
+    color:{ask:['Name a color you can see right now!','Say any color!','What\'s your favorite color?'], yes:x=>`${cap(x)}! Nice one.`,
+      items:['red','blue','green','yellow','orange','purple','pink','black','white','brown','gray','grey','silver','gold','violet','maroon','navy','beige','pula','asul','bughaw','berde','luntian','dilaw','kahel','lila','rosas','itim','puti','kayumanggi','abo','ginto','pilak']},
+    food:{ask:['Name a Filipino dish!','What Filipino food are you craving right now?','What\'s the best merienda?'], yes:x=>`${cap(x)}! Now I'm hungry!`,
+      items:['adobo','sinigang','lechon','sisig','kare kare','pancit','lumpia','tinola','bulalo','lugaw','arroz caldo','goto','tapsilog','silog','longganisa','tocino','tapa','halo halo','bibingka','puto','kakanin','turon','banana cue','kamote cue','balut','kwek kwek','fishball','fish ball','isaw','champorado','dinuguan','bicol express','laing','pinakbet','kaldereta','caldereta','menudo','afritada','mechado','bistek','inasal','crispy pata','chicharon','taho','ensaymada','pandesal','bangus','tuyo','daing','kinilaw','batchoy','sopas','spaghetti','fried chicken','chicken joy','ginataan','leche flan','ube','siopao','siomai','palabok','bopis','dinakdakan','kilawin','paksiw','nilaga','sinangag','kanin','rice','kutsinta','sapin sapin','biko','maja blanca','empanada','okoy','tokwa','bagoong','pares','mami','lomi','bulalo']},
+    vehicle:{ask:['Name a vehicle you can see on the road!','Say any kind of vehicle!'], yes:x=>`${cap(x)}! Keep a safe distance!`,
+      items:['car','bus','jeep','jeepney','tricycle','trike','motorcycle','motor','bike','bicycle','truck','van','taxi','train','plane','airplane','boat','ship','scooter','suv','pickup','pick up','kotse','trak','bangka','barko','eroplano','tren','kalesa','habal habal','lrt','mrt','ferry','helicopter','grab','sedan','ambulance','firetruck','fire truck','police car','delivery']},
+    store:{ask:['Name something you can buy at a sari-sari store!','What\'s your go-to sari-sari store snack?'], yes:x=>`${cap(x)}! Suki ka pala!`,
+      items:['chips','chichirya','chicharon','candy','kendi','softdrinks','soft drinks','coke','soda','sardines','sardinas','noodles','pancit canton','lucky me','instant noodles','bread','tinapay','pandesal','egg','eggs','itlog','coffee','kape','3 in 1','three in one','load','shampoo','sabon','soap','toothpaste','biscuit','biscuits','biskwit','milk','gatas','sugar','asukal','salt','asin','rice','bigas','oil','mantika','vinegar','suka','soy sauce','toyo','ice','yelo','water','tubig','juice','gum','bubble gum','corned beef','spam','tuna','ice cream','yakult','skyflakes','cigarettes','yosi','matches','posporo','candle','kandila','vitamins','ketchup','mayonnaise','peanuts','mani','banana chips','turon','ice candy']}
+  };
+  const TRIVIA = [
+    {q:'What color is a ripe banana?', a:['yellow','dilaw'], say:'yellow'},
+    {q:'How many wheels does a tricycle have?', a:['three','tatlo','tres'], num:3, say:'three'},
+    {q:'What\'s the capital of the Philippines?', a:['manila','maynila'], say:'Manila'},
+    {q:'How many days are in a week?', a:['seven','pito','siyete'], num:7, say:'seven'},
+    {q:'What sweet thing do bees make?', a:['honey','pulot','pulot pukyutan'], say:'honey'},
+    {q:'What\'s the opposite of hot?', a:['cold','malamig','lamig','cool'], say:'cold'},
+    {q:'Which is bigger, an elephant or a mouse?', a:['elephant','elepante'], say:'the elephant'},
+    {q:'What day comes after Monday?', a:['tuesday','martes'], say:'Tuesday'},
+    {q:'How many minutes are in one hour?', a:['sixty','60','sisenta','animnapu'], num:60, say:'sixty'},
+    {q:'What color is the sky on a sunny day?', a:['blue','asul','bughaw','light blue'], say:'blue'},
+    {q:'What animal says moo?', a:['cow','baka'], say:'a cow'},
+    {q:'How many legs does a spider have?', a:['eight','walo','otso'], num:8, say:'eight'},
+    {q:'What\'s the national fruit of the Philippines?', a:['mango','mangga'], say:'mango'},
+    {q:'What do you call a baby cat?', a:['kitten','kitty','kuting'], say:'a kitten'},
+    {q:'What do you call frozen water?', a:['ice','yelo'], say:'ice'},
+    {q:'Which is faster, a jeepney or an airplane?', a:['airplane','plane','eroplano','aeroplane'], say:'the airplane'},
+    {q:'How many months are in a year?', a:['twelve','labindalawa','dose'], num:12, say:'twelve'},
+    {q:'What do you get when you mix red and white?', a:['pink','rosas'], say:'pink'},
+    {q:'What color are most leaves?', a:['green','berde','luntian'], say:'green'},
+    {q:'How many fingers are on one hand?', a:['five','lima','singko'], num:5, say:'five'},
+    {q:'What comes after the number nine?', a:['ten','sampu','diyes'], num:10, say:'ten'},
+    {q:'Which is sweeter, candy or lemon?', a:['candy','kendi'], say:'candy'},
+    {q:'What does a rooster say in the morning?', a:['cock a doodle doo','cockadoodledoo','tilaok','kokak','kukuruku','cock a doodle','doodle'], say:'cock-a-doodle-doo'},
+    {q:'What\'s the first month of the year?', a:['january','enero'], say:'January'}
+  ];
+  const RHYMES = [
+    {w:'car', ends:['ar','are'], ex:'star'}, {w:'cat', ends:['at'], ex:'hat'}, {w:'day', ends:['ay','ey','eigh'], ex:'play'},
+    {w:'night', ends:['ight','ite'], ex:'light'}, {w:'fun', ends:['un','one','on'], ex:'sun'}, {w:'tree', ends:['ee','ea','ey'], extra:['me','he','she','we','be','ski'], ex:'bee'},
+    {w:'go', ends:['o','ow','oe'], ex:'snow'}, {w:'bed', ends:['ed','ead','aid'], ex:'red'}, {w:'cake', ends:['ake','eak','ache'], ex:'lake'},
+    {w:'ring', ends:['ing'], ex:'sing'}, {w:'road', ends:['oad','ode','owed','oed'], ex:'toad'}, {w:'boat', ends:['oat','ote'], ex:'goat'}
+  ];
+  const CHATS = [
+    {q:'Where are you headed today?', r:t=>`${cap(short(t))}! Let's get there safely.`},
+    {q:'What are you going to eat when you get home?', r:t=>`Mmm, ${short(t)}! Save me some!`},
+    {q:'What song would you sing at karaoke tonight?', r:t=>`${cap(short(t))}? Sing it for me later!`},
+    {q:'Who will you talk to first when you arrive?', r:()=> 'Say hi to them for me!'},
+    {q:'What was the best part of your day?', r:()=> 'Aww, that sounds nice! Thanks for sharing.'},
+    {q:'If you could eat one food forever, what would it be?', r:t=>`${cap(short(t))} forever? Good choice!`},
+    {q:'Beach or mountains for a weekend trip?', choice:[{w:['beach','dagat','sea','island','isla'], r:'Beach! Sun, sand and halo-halo.'},{w:['mountain','mountains','bundok','baguio','tagaytay','hike'], r:'Mountains! Cool air and a nice view.'}], r:()=> 'Both sound fun!'},
+    {q:'Coffee or milk tea?', choice:[{w:['coffee','kape','latte','americano'], r:'Coffee! A classic road-trip drink.'},{w:['milk tea','milktea','tea','boba'], r:'Milk tea! Extra pearls for me, please.'}], r:()=> 'Good choice!'},
+    {q:'Rice or bread for breakfast?', choice:[{w:['rice','kanin','sinangag','silog'], r:'Rice! A true Pinoy breakfast.'},{w:['bread','tinapay','pandesal','toast'], r:'Pandesal and coffee, perfect!'}], r:()=> 'Why not both?'},
+    {q:'What\'s one thing that made you smile this week?', r:()=> 'That makes me smile too!'},
+    {q:'If you won a free trip, where would you go?', r:t=>`${cap(short(t))}! Take me with you!`},
+    {q:'What movie or show are you watching lately?', r:t=>`${cap(short(t))}? Tell me how it ends!`}
+  ];
+
+  const GEN = {
+    math(){
+      const r=Math.random(); let a,b,ans,txt;
+      if(r<.6){ a=rand(2,9); b=rand(1,9); ans=a+b; txt=`${a} plus ${b}`; }
+      else if(r<.85){ a=rand(6,15); b=rand(1,5); ans=a-b; txt=`${a} minus ${b}`; }
+      else { a=rand(2,9); ans=a*2; txt=`double ${a}`; }
+      return {type:'math', ask:pick([`Quick math! What's ${txt}?`,`Easy one: what's ${txt}?`,`Math time! What's ${txt}?`]), reveal:`${cap(txt)} is ${ans}.`,
+        check(alts){
+          if(alts.some(x=>numbers(x).includes(ans))) return {ok:true, reply:pick([`${ans}! Tama!`,`${ans} is right!`,`Correct, ${ans}!`])};
+          return {ok:false, reply:`So close! ${cap(txt)} is ${ans}. You'll get the next one!`};
+        }};
+    },
+    name(){
+      const key=pick(Object.keys(CATS)), c=CATS[key];
+      return {type:'name', ask:pick(c.ask), reveal:'Thanks!',
+        check(alts){ const m=findIn(alts,c.items); return m ? {ok:true, reply:c.yes(m)} : {ok:null, reply:`“${short(alts[0])}”? Hmm, not sure, but I heard you!`}; }};
+    },
+    trivia(){
+      const t=pick(TRIVIA);
+      return {type:'trivia', ask:pick(['Trivia time! ','Easy question: ','Here\'s one: '])+t.q, reveal:`It's ${t.say}.`,
+        check(alts){
+          if(findIn(alts,t.a) || (t.num!==undefined && alts.some(x=>numbers(x).includes(t.num)))) return {ok:true, reply:`${cap(t.say)}! You got it!`};
+          return {ok:false, reply:`Good try! It's ${t.say}.`};
+        }};
+    },
+    rhyme(){
+      const r=pick(RHYMES);
+      return {type:'rhyme', ask:`Rhyme time! Say a word that rhymes with “${r.w}”.`, reveal:`Like “${r.ex}”!`,
+        check(alts){
+          for(const a of alts) for(const w of norm(a).split(' ')){
+            if(!w || w===r.w || w.length<2) continue;
+            if((r.extra||[]).includes(w) || r.ends.some(e=>w.endsWith(e))) return {ok:true, reply:`“${w}”! That rhymes with ${r.w}!`};
+          }
+          return {ok:null, reply:`“${short(alts[0])}”? Nice try! Something like “${r.ex}” works too.`};
+        }};
+    },
+    road(){
+      return pick([
+        {type:'road', ask:'Road check! What color is the car in front of you?', reveal:'Keep a safe distance!',
+          check(alts){ const c=findIn(alts,CATS.color.items); return {ok:null, reply: c ? `A ${c} one! Keep a safe distance behind it.` : 'Got it! Keep a safe distance.'}; }},
+        {type:'road', ask:'Is there a car right in front of you? Yes or no?', reveal:'Eyes on the road!',
+          check(alts){ const y=yesNo(alts); return {ok:null, reply: y==='yes' ? 'Okay! Keep a nice safe gap.' : y==='no' ? 'Open road! Still, easy on the speed.' : 'Okay! Eyes on the road.'}; }},
+        {type:'road', ask:'How many cars can you see ahead of you right now?', reveal:'Stay sharp!',
+          check(alts){ const n=alts.flatMap(x=>numbers(x))[0]; return {ok:null, reply: n===undefined ? 'Got it! Stay sharp out there.' : n===0 ? 'Wow, an empty road! Enjoy it safely.' : `${n}! Stay sharp around them.`}; }},
+        {type:'road', ask:'Look at the next road sign you pass. What does it say?', reveal:'Good eyes!',
+          check(alts){ return {ok:null, reply:`“${short(alts[0])}”. Good eyes!`}; }}
+      ]);
+    },
+    chat(){
+      const c=pick(CHATS);
+      return {type:'chat', ask:c.q, reveal:'Thanks!',
+        check(alts){
+          if(c.choice){ for(const o of c.choice) if(findIn(alts,o.w)) return {ok:null, reply:o.r}; }
+          return {ok:null, reply:c.r(alts[0])};
+        }};
+    },
+    sleepy(){
+      return {type:'sleepy', ask:pick(['Honest answer: are you feeling sleepy? Yes or no?','Are your eyes getting heavy? Yes or no?','Inaantok ka na ba? Yes or no?']), reveal:'Thanks!',
+        check(alts){
+          const y=yesNo(alts);
+          if(y==='yes') return {ok:null, sleepy:true, mood:'worried', reply:"Thanks for telling me. Let's stop somewhere safe soon. Say “break” when you're parked."};
+          if(y==='no') return {ok:true, reply:'Great! You sound wide awake.'};
+          return {ok:null, reply:'Okay! Tell me if you start feeling sleepy.'};
+        }};
+    },
+    memory(){
+      const d=[]; while(d.length<3){ const n=rand(1,9); if(!d.includes(n)) d.push(n); }
+      S.memo={d, at:S.passed+1};
+      return {type:'memory', ask:`Memory game! Remember these numbers: ${d.join(', ')}. Now say them back to me!`, reveal:`They're ${d.join(', ')}. Remember them for later!`,
+        check(alts){
+          if(alts.some(x=>hasSeq(numbers(x,true),d))) return {ok:true, reply:"Perfect! Keep them in mind, I'll ask again later."};
+          return {ok:false, reply:`Almost! They're ${d.join(', ')}. Remember them for later!`};
+        }};
+    },
+    recall(){
+      const d=S.memo.d; S.memo=null;
+      return {type:'recall', ask:'Remember my three numbers from before? What were they?', reveal:`They were ${d.join(', ')}.`,
+        check(alts){
+          if(alts.some(x=>hasSeq(numbers(x,true),d))) return {ok:true, reply:'Wow, you remembered! Ang galing!'};
+          return {ok:false, reply:`They were ${d.join(', ')}. That was a tricky one!`};
+        }};
+    }
+  };
+  function nextQuestion(){
+    if(!Voice.usable()) return GEN[pick(['math','trivia','road'])]();
+    if(S.memo && S.passed>=S.memo.at && Math.random()<.65) return GEN.recall();
+    const pool=['math','math','name','name','trivia','trivia','rhyme','road','road','chat'];
+    if(!S.memo) pool.push('memory');
+    if(S.passed>=2 && alertness()<75) pool.push('sleepy','sleepy'); else if(S.passed%4===3) pool.push('sleepy');
+    let t, guard=0; do{ t=pick(pool); }while(t===S.lastType && ++guard<20);
+    S.lastType=t;
+    return GEN[t]();
+  }
+  function chatQuestion(){ return GEN[pick(['chat','chat','name','road'])](); }
+  const FUN = ['Roll your shoulders back and sit up tall. Feels better, right?','Take a deep breath in… and out. Crack a window for fresh air.',
+    'Fun fact: a quick stretch at a stop wakes you up better than you think!','Sip some water. Staying hydrated helps you stay alert.'];
+
+  /* ---------- alertness ---------- */
+  function alertness(){
+    let score=100;
+    if(S.times.length>=3){
+      const base=Math.min(...S.times.slice(0,3).concat([2500]));
+      const recent=S.times.slice(-3), avg=recent.reduce((a,b)=>a+b,0)/recent.length;
+      score -= Math.max(0, Math.min(35, (avg/base - 1) * 30));
+    }
+    score -= S.missed*25 + Math.min(20, S.wrong*4) + S.sleepy*15;
+    const hrs=S.driveMs/3600000; if(hrs>1) score -= (hrs-1)*12;
+    const h=new Date().getHours(); if(h>=1&&h<6) score -= 12; else if(h>=13&&h<16) score -= 5;
+    return Math.max(0,Math.min(100,Math.round(score)));
+  }
+  function paintAlert(){
+    if(S.state==='idle'){ $('alertLabel').textContent='Ready'; $('alertLabel').style.color=''; $('meter').style.width='100%'; $('meter').style.background='var(--go)'; return; }
+    const a=alertness(), m=$('meter'); m.style.width=a+'%';
+    const [label,col] = a>=70?['Alert','var(--go)']:a>=45?['Fading','var(--warn)']:['Drowsy','var(--stop)'];
+    m.style.background=col; $('alertLabel').textContent=label; $('alertLabel').style.color=col;
+    if(a<45 && S.state==='drive') showBanner(NAME()+" thinks you're getting drowsy. Plan a stop at the next safe place.");
+  }
+  function showBanner(t){ const b=$('banner'); b.textContent=t; b.hidden=false; }
+
+  /* ---------- conversation flow ---------- */
+  function scheduleCheck(){
+    const base=Number($('interval').value)*60000;
+    const jitter=base*(0.7+Math.random()*0.5);
+    const tired=alertness()<60 ? 0.6 : 1;
+    S.nextCheckAt=Date.now()+jitter*tired;
+    S.nextChatAt=Date.now()+jitter*tired*0.5;
+  }
+  function ask(kind){
+    const q = kind==='check' ? nextQuestion() : chatQuestion();
+    S.convo={q, kind, attempts:0, listenStart:0, heardAt:0, done:false};
+    if(kind==='check'){ S.state='check'; document.body.classList.add('check'); $('ringProg').style.strokeDashoffset='0'; $('ringProg').style.stroke='var(--go)'; chime(); }
+    mood('ask'); hint.textContent='';
+    say(q.ask, beginListen);
+  }
+  function beginListen(){
+    const c=S.convo; if(!c || c.done) return;
+    c.listenStart=Date.now(); c.heardAt=0;
+    if(Voice.usable()) Voice.listen();
+    else hint.textContent = c.kind==='check' ? `Tap ${NAME()} or the big button to answer` : '';
+  }
+  function heard(alts){
+    if(S.state==='alarm'){ stopAlarm(); return; }
+    const c=S.convo; if(!c || c.done) return;
+    hint.textContent=`You said: “${short(alts[0])}”`;
+    if(findIn(alts,BREAK_WORDS)){ c.done=true; S.convo=null; startBreak(); return; }
+    resolve(alts, false);
+  }
+  function resolve(alts, tapped){
+    const c=S.convo; if(!c) return;
+    c.done=true; S.convo=null; Voice.stop();
+    const now=Date.now(), rt=(c.heardAt||now)-(c.listenStart||now);
+    const r = tapped ? {ok:null, reply:`Got it! ${c.q.reveal}`} : c.q.check(alts);
+    if(c.kind==='check'){
+      S.state='drive'; document.body.classList.remove('check'); S.passed++;
+      if(rt>0) S.times.push(rt);
+      if(r.ok===false) S.wrong++;
+    }
+    if(r.sleepy) S.sleepy++;
+    let line = r.ok===true ? `${pick(BUDDY[G].yay)} ${r.reply}` : r.reply;
+    if(c.kind==='check' && rt>0 && S.times.length>=4 && rt>1.8*Math.min(...S.times.slice(0,3)) && now-S.lastSlowWarn>120000){
+      S.lastSlowWarn=now; r.mood='worried'; line+=' You took a bit longer that time. Are you getting tired?';
+    }
+    if(r.ok===true) happy();
+    mood(r.mood || (r.ok===true ? 'cheer' : 'happy'));
+    setTimeout(()=>{ if(!S.convo && S.state==='drive' && pet.dataset.mood!=='worried') mood('happy'); },1600);
+    say(line);
+    if(c.kind==='check'){ scheduleCheck(); stats(); paintAlert(); }
+    setTimeout(driveHint, 4000);
+  }
+  function timeoutConvo(now){
+    const c=S.convo; Voice.stop();
+    if(c.kind==='chat'){ c.done=true; S.convo=null; mood('happy'); say(pick(['Okay! Eyes on the road.','No worries, just drive safe.','I\'ll ask you later!'])); driveHint(); return; }
+    if(++c.attempts===1){
+      c.listenStart=0; c.heardAt=0; mood('ask');
+      tone(1320,0,.2,'square',.4); tone(1320,.3,.2,'square',.4);
+      say(`Hello? I didn't hear you! ${c.q.ask}`, beginListen);
+    } else { c.done=true; S.convo=null; startAlarm(); }
+  }
+
+  /* ---------- drive states ---------- */
+  function startDrive(){
+    audio();
+    try{ if(Voice.mode==='native' && !PipNative.hasMic()) PipNative.requestMic(); }catch(e){}
+    Object.assign(S,{state:'drive',driveMs:0,lastTick:Date.now(),times:[],missed:0,passed:0,wrong:0,sleepy:0,nextBreakAt:BREAK_EVERY,memo:null,convo:null,lastType:''});
+    $('banner').hidden=true; $('driveRow').hidden=false;
+    $('mainBtn').textContent='Tap to answer'; $('mainBtn').className='btn';
+    mood('cheer'); setTimeout(()=>{ if(S.state==='drive' && !S.convo) mood('happy'); },1400);
+    say(Voice.usable() ? "Let's go! Every few minutes I'll ask you something easy. Just answer out loud!" : "Let's go! I'll check on you every few minutes. Tap me when I ask.");
+    scheduleCheck(); stats(); driveHint();
+  }
+  function startAlarm(){
+    S.state='alarm'; S.missed++; document.body.classList.remove('check');
+    mood('alarm'); $('alarm').hidden=false; S.alarm={phase:'siren', t:Date.now()}; sirenOn();
+    $('alarmHint').textContent = Voice.usable() ? 'Say “I\'m awake!” or tap anywhere' : 'Tap anywhere to stop the alarm';
+    say("Wake up! Wake up! Say I'm awake!");
+    stats(); paintAlert();
+  }
+  function stopAlarm(){
+    sirenOff(); Voice.stop(); $('alarm').hidden=true; S.alarm=null; S.state='drive'; mood('worried');
+    say("Phew, you're back! Please find a safe place to stop and rest.");
+    showBanner('You missed a check. A 15-minute nap or a short walk helps more than coffee alone.');
+    scheduleCheck(); paintAlert(); setTimeout(driveHint,4000);
+  }
+  function clearConvo(){ if(S.convo){ S.convo.done=true; S.convo=null; } Voice.stop(); document.body.classList.remove('check'); }
+  function startBreak(){
+    sirenOff(); clearConvo(); $('alarm').hidden=true; S.alarm=null;
+    S.state='break'; S.breakUntil=Date.now()+BREAK_LEN; S.nextBreakAt=S.driveMs+BREAK_EVERY;
+    mood('sleep'); say("Break time! Stretch, walk and drink some water. I'll nap too.");
+    $('mainBtn').textContent='Resume drive'; $('mainBtn').className='btn go'; $('breakBtn').hidden=true;
+    hint.textContent='Break timer running'; $('banner').hidden=true;
+  }
+  function resumeDrive(){
+    S.state='drive'; S.lastTick=Date.now(); S.missed=Math.max(0,S.missed-1); S.sleepy=0; S.wrong=0; S.times=S.times.slice(-2);
+    $('mainBtn').textContent='Tap to answer'; $('mainBtn').className='btn'; $('breakBtn').hidden=false;
+    mood('cheer'); setTimeout(()=>{ if(S.state==='drive' && !S.convo) mood('happy'); },1400);
+    say("Refreshed? Let's roll!"); scheduleCheck(); paintAlert(); driveHint();
+  }
+  function endDrive(){
+    sirenOff(); clearConvo(); $('alarm').hidden=true; S.alarm=null;
+    const mins=Math.round(S.driveMs/60000);
+    S.state='idle'; mood('happy'); $('driveRow').hidden=true; $('breakBtn').hidden=false;
+    $('mainBtn').textContent='Start drive'; $('mainBtn').className='btn go';
+    say(`Trip done! ${mins} minutes and ${S.passed} questions answered. Ingat!`);
+    hint.textContent='Press Start drive for your next trip.';
+    $('nextCheck').textContent='--:--'; paintAlert();
+  }
+  function stats(){
+    const avg=S.times.length?(S.times.reduce((a,b)=>a+b,0)/S.times.length/1000).toFixed(1)+'s':'–';
+    $('stats').textContent=`Answered ${S.passed} · Avg reply ${avg} · Missed ${S.missed}`;
+  }
+  const fmt = ms => { const s=Math.max(0,Math.ceil(ms/1000)), h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60;
+    return h?`${h}:${String(m).padStart(2,'0')}:${String(x).padStart(2,'0')}`:`${m}:${String(x).padStart(2,'0')}`; };
+
+  /* ---------- loop ---------- */
+  setInterval(()=>{
+    const now=Date.now();
+    if(Voice.active && now-Voice.startedAt>15000){ Voice.stop(); if(wantListening()) relisten(); }
+    if(S.state==='drive'||S.state==='check'||S.state==='alarm') S.driveMs+=now-S.lastTick;
+    S.lastTick=now;
+    if(S.state==='idle') return;
+    $('driveTime').textContent=fmt(S.driveMs);
+    if(S.state==='break'){
+      const left=S.breakUntil-now; $('nextCheck').textContent=fmt(left);
+      if(left<=0 && !S.breakDone){ S.breakDone=true; chime(); say("Break's over. Ready when you are!"); }
+      return;
+    }
+    S.breakDone=false;
+    if(S.state==='alarm' && S.alarm){
+      const a=S.alarm, el=now-a.t;
+      if(a.phase==='siren' && el>3500 && Voice.usable()){ sirenOff(); a.phase='listen'; a.t=now; $('alarmHint').textContent='Listening… say “I\'m awake!”'; Voice.listen(); }
+      else if(a.phase==='listen' && el>4500){ Voice.stop(); a.phase='siren'; a.t=now; sirenOn(); $('alarmHint').textContent='Say “I\'m awake!” or tap anywhere'; }
+      return;
+    }
+    const c=S.convo;
+    if(c && c.listenStart && !c.done){
+      const win=Voice.usable()? LISTEN_WINDOW : TAP_WINDOW, el=now-c.listenStart, frac=Math.min(1,el/win);
+      if(c.kind==='check'){
+        $('ringProg').style.strokeDashoffset=String(frac*100);
+        $('ringProg').style.stroke=frac>.66?'var(--stop)':frac>.33?'var(--warn)':'var(--go)';
+      }
+      const grace = c.heardAt ? 5000 : 0;
+      if(el>=win+grace) timeoutConvo(now);
+    }
+    if(S.state==='check'){ $('nextCheck').textContent='NOW'; }
+    if(S.state==='drive' && !S.convo){
+      $('nextCheck').textContent=fmt(S.nextCheckAt-now);
+      if(now>=S.nextCheckAt) ask('check');
+      else if($('chat').checked && S.nextChatAt && now>=S.nextChatAt){
+        S.nextChatAt=0;
+        if(Voice.usable()) ask('chat'); else say(pick(FUN));
+      }
+      if(S.driveMs>=S.nextBreakAt && !S.convo){
+        S.nextBreakAt=S.driveMs+30*60000; mood('worried');
+        say(`You've been driving ${Math.round(S.driveMs/60000)} minutes. Let's take a break at the next stop. Just say “break” when you're parked.`);
+        showBanner('Experts suggest a 15-minute break every 2 hours of driving.');
+      }
+    }
+    if(now%5000<250) paintAlert();
+  },250);
+
+  /* ---------- input ---------- */
+  function tap(){
+    if(S.state==='alarm'){ stopAlarm(); return; }
+    if(S.state==='break' || S.state==='idle') return;
+    if(S.convo && S.convo.kind==='check'){ resolve([], true); return; }
+    if(S.convo) return;
+    mood('cheer'); happy(); setTimeout(()=>{ if(S.state==='drive' && !S.convo) mood('happy'); },1200);
+  }
+  $('stage').addEventListener('pointerdown', tap);
+  $('stage').addEventListener('keydown', e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); tap(); }});
+  $('alarm').addEventListener('pointerdown', stopAlarm);
+  $('mainBtn').addEventListener('click', ()=>{ if(S.state==='idle') startDrive(); else if(S.state==='break') resumeDrive(); else tap(); });
+  $('breakBtn').addEventListener('click', startBreak);
+  $('endBtn').addEventListener('click', endDrive);
+
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && Voice.active){ Voice.stop(); if(wantListening()) relisten(); } });
+  Voice.init();
+  setGender(G,false);
+  bubble.textContent=`Hi, I'm ${NAME()}! I'll ride along and keep you awake.`;
+  hint.textContent = Voice.mode ? 'Press Start drive, then answer my questions out loud.' : 'Mount your phone, then press Start drive.';
+})();
+</script>
+</body>
+</html>

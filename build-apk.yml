@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Restore signing key
+        env:
+          PIP_KEYSTORE_B64: ${{ secrets.PIP_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$PIP_KEYSTORE_B64" ]; then
+            echo "$PIP_KEYSTORE_B64" | base64 -d > pip.keystore
+          else
+            echo "::warning::No PIP_KEYSTORE_B64 secret set. Using a temporary key, so this APK can't update an earlier install."
+          fi
+
+      - name: Build APK
+        env:
+          KS_PASS: ${{ secrets.PIP_KEYSTORE_PASS || 'pipbuddy' }}
+        run: bash build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PipRoadBuddy-apk
+          path: build/PipRoadBuddy.apk
+
+      - name: Attach APK to the "apk-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: Latest APK
+          body: Built automatically from the main branch. Download PipRoadBuddy.apk and open it on your phone.
+          files: build/PipRoadBuddy.apk
